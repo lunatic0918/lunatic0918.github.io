@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>遗忘索引 - 归档浏览器</title>
+<style>
+*{
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+body{
+    background: #2c2c2c;
+    font-family: "SimSun", serif;
+    color: #4a423b;
+    padding: 36px 20px;
+    background-image:
+        radial-gradient(ellipse at center, transparent 42%, rgba(0,0,0,0.45) 100%),
+        url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%' height='100%' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    min-height: 100vh;
+}
+.browser-wrap{
+    width: 1100px;
+    margin: 0 auto;
+    background: #f0ece4;
+    border: 1px solid #8c8278;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 0 30px rgba(0,0,0,0.35);
+}
+.browser-titlebar{
+    height: 34px;
+    background: #72685f;
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    color: #e2dfd8;
+    font-size: 14px;
+}
+.browser-dots{
+    display: flex;
+    gap: 7px;
+    margin-right: 14px;
+}
+.dot{
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #3a3a3a;
+}
+.search-bar{
+    padding: 14px 18px;
+    background: #e4dfd6;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    border-bottom: 1px solid #b8afa4;
+}
+#search-input{
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid #94887c;
+    background: #f7f4ee;
+    font-family: SimSun, serif;
+    font-size: 15px;
+    color: #423a32;
+    border-radius: 3px;
+}
+#search-btn, #reset-btn{
+    padding: 8px 16px;
+    border: 1px solid #7c7065;
+    background: #d3cdc2;
+    cursor: pointer;
+    font-family: SimSun, serif;
+    color: #443c34;
+    border-radius: 3px;
+}
+#search-btn:hover, #reset-btn:hover{
+    background: #c2bbae;
+}
+.history-panel{
+    padding: 10px 18px;
+    background: #e9e4db;
+    font-size: 13px;
+    border-bottom: 1px solid #b8afa4;
+    max-height: 92px;
+    overflow-y: auto;
+    color: #554c43;
+}
+.history-label{
+    font-weight: bold;
+}
+.content-area{
+    min-height: 500px;
+    padding: 28px 36px;
+    line-height: 1.8;
+    font-size: 16px;
+    position: relative;
+    color: #4a423b;
+}
+.page-img{
+    max-width: 480px;
+    margin: 16px 0 24px;
+    border: 1px solid #aaa298;
+    position: relative;
+    border-radius: 4px;
+    overflow: hidden;
+}
+.img-mask{
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 42%;
+    height: 100%;
+    background: rgba(85,80,75,0.52);
+}
+.type-text{
+    white-space: pre-line;
+}
+.glitch{
+    animation: glitchAnim 0.3s;
+}
+@keyframes glitchAnim{
+    0%{transform: translateX(0); filter: none;}
+    25%{transform: translateX(-2px); filter: brightness(0.94);}
+    50%{transform: translateX(2px); filter: brightness(0.90);}
+    100%{transform: translateX(0); filter: none;}
+}
+.flower-mark{
+    position: absolute;
+    top: 18px;
+    right: 28px;
+    font-size: 28px;
+    opacity: 0.65;
+}
+a.archive-link{
+    color: #3a4b70;
+    text-decoration: underline;
+    cursor: pointer;
+}
+a.archive-link:hover{
+    color: #703a3a;
+}
+.quote-block{
+    margin: 14px 0;
+    padding: 12px 16px;
+    border-left: 3px solid #b8afa4;
+    background: #e9e4db;
+    color: #554c43;
+    font-size: 15px;
+}
+.divider{
+    margin: 18px 0;
+    height: 1px;
+    background: #c8c0b4;
+}
+.comment-block{
+    margin-top: 16px;
+    padding: 12px;
+    background: #e4dfd6;
+    border-radius: 4px;
+    font-size: 14px;
+    color: #60574e;
+}
+.comment-title{
+    font-size: 14px;
+    margin-bottom: 8px;
+    color: #50473f;
+}
+</style>
+</head>
+<body>
+<div class="browser-wrap">
+    <div class="browser-titlebar">
+        <div class="browser-dots">
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+        </div>
+        遗忘归档浏览器
+    </div>
+    <div class="search-bar">
+        <input id="search-input" placeholder="在此输入关键词检索归档...">
+        <button id="search-btn">检索</button>
+        <button id="reset-btn">重置归档</button>
+    </div>
+    <div class="history-panel">
+        <span class="history-label">检索历史：</span>
+        <span id="history-list"></span>
+    </div>
+    <div id="content" class="content-area"></div>
+</div>
+
+<script>
+const pageData = {
+    "home":{
+        title:"遗忘归档 · 首页",
+        imgName:"残缺蓝铃花与老式挂钟",
+        content:`<p>归档快照平台 old_archive_v07，服务器离线快照 · 2012</p>
+<p>平台公告：本站多年前已经停止维护，大量链接失效，图片资源丢失，部分内容存在乱码缺损。管理员早已失联，仅剩下这份离线备份。</p>
+<div class="divider"></div>
+<p>站点内残留博客列表：</p>
+<p>• <a class="archive-link" data-goto="blog1">《我的钟表与蓝铃花》 —— 博主：埃米尔，写给莉娜</a></p>
+<p>• <a class="archive-link" data-goto="water1">【闲聊】最近天气一直阴雨，适合收拾旧东西</a></p>
+<p>• <a class="archive-link" data-goto="water2">【求助】家里老钟走时不准，有没有懂维修的朋友？</a></p>
+<p>• <a class="archive-link" data-goto="water3">贴图：郊外野花随拍，不知道是什么品种</a></p>
+<p>• <a class="archive-link" data-goto="water4">【灌水】深夜睡不着，随便写几句碎念</a></p>
+<div class="divider"></div>
+<div class="comment-block">
+    <div class="comment-title">访客留言</div>
+    <p>匿名：好多页面点进去都是空白，这个归档没救了。</p>
+    <p>匿名：我好几年前来过这里，那时候还有很多照片。</p>
+    <p>匿名：不知道埃米尔还会不会回来更新，莉娜的记录大多都破损了。</p>
+</div>`,
+        isEnd:false
+    },
+    "blog1":{
+        title:"埃米尔的博客｜我的钟表与蓝铃花",
+        imgName:"残缺蓝铃花与老式挂钟",
+        content:`<p>我慢慢记不清很多事情了。</p>
+<p>我试着把那些不想丢掉的片段，一点点存到这里。</p>
+<div class="quote-block">
+有人问我，这些花是为谁种的。她叫莉娜，很喜欢郊外成片的蓝铃花。我们曾经约定，每年等到那个日子，一起去花海。
+</div>
+<p>我修好的钟表，还在墙上静静挂着。我打算为她做一件可以播放旋律的小物件，作为一份长久的念想。</p>
+<div class="comment-block">
+    <div class="comment-title">评论区</div>
+    <p>访客：写得好安静，有点伤感。</p>
+    <p>访客：蓝铃花我见过，花期很短。</p>
+    <p>访客：钟表修起来麻烦吧？</p>
+</div>`,
+        isEnd:false
+    },
+    "莉娜":{
+        title:"莉娜 - 个人简介（破损归档）",
+        imgName:"郊外蓝铃花花海朦胧剪影",
+        content:`<p>页面头部大量乱码，文字断断续续，部分段落直接空白。</p>
+<div class="quote-block">
+她喜欢泥土，喜欢在郊外的坡地上播种。每年等到花开的时候，整片原野都会变成淡淡的蓝紫色。埃米尔答应她，要做一件可以转动、响起曲子的八音盒。
+</div>
+<p>他们约定的日子是4月29日，那是这片花海开得最盛的时候。很多照片加载失败，只剩下这片花海的轮廓。</p>
+<div class="comment-block">
+    <div class="comment-title">访客留言</div>
+    <p>访客：这地方看着好远，想去看看。</p>
+    <p>访客：我也喜欢种花，可惜总是养不活。</p>
+    <p>访客：快照缺了好多内容，太可惜了。</p>
+</div>`,
+        isEnd:false
+    },
+    "八音盒":{
+        title:"埃米尔的私密日志快照",
+        imgName:"老旧木制八音盒",
+        content:`<p>木头外壳已经磨得很旧，齿轮上有一层薄薄的锈迹。</p>
+<div class="quote-block">
+我反复调试里面的金属簧片，最终定下这首曲子。旋律停在五点十七分，就像我们那次相遇的时刻。有时候我对着墙面那面裂纹镜子发呆，恍惚间，好像能看见一个影子站在对面。
+</div>
+<p>伸手去碰，什么都抓不住。只有乐曲响起的片刻，那道轮廓才会短暂显现。</p>
+<div class="comment-block">
+    <div class="comment-title">系统备注</div>
+    <p>此日志设置为仅博主可见，没有公开评论。</p>
+</div>`,
+        isEnd:false
+    },
+    "镜子":{
+        title:"匿名论坛 · 旧归档讨论帖",
+        imgName:"裂纹老镜子带淡虚影",
+        content:`<p>标题：有人翻过埃米尔的归档吗？有些地方很奇怪。</p>
+<div class="quote-block">
+楼层1：我翻了很久，大部分图片都是裂的、加载不完整。
+楼层2：我看到一段文字，说那个影子只会在音乐流淌的时候显现出来。
+楼层3：劝大家不要强行把所有碎片拼到一起，有人试过，页面直接崩掉了。
+楼层4：如果一定要把全部记忆复原，密钥写在这里：remembrance
+楼层5：有些东西适合埋进土里慢慢休眠，种子需要土壤。
+</div>
+<div class="comment-block">
+    <div class="comment-title">后续楼层</div>
+    <p>访客：什么密钥？看不懂。</p>
+    <p>访客：楼主是不是想太多了，就是普通老人的博客而已。</p>
+    <p>访客：我进来只是随便逛逛，没仔细看。</p>
+</div>`,
+        isEnd:false
+    },
+    "种子":{
+        title:"废弃相册快照",
+        imgName:"窗台空陶土花盆",
+        content:`<p>相册文件夹里只剩下寥寥几张缩略图，其余全部丢失。</p>
+<div class="quote-block">
+照片里是窗台上的陶盆，里面只有一点干燥发黑的泥土。配文：不必强行唤醒沉睡的往事，让它安安静静留在这里就好。如果愿意放下，会有另一种方式封存这份记录。
+</div>
+<p>页面角落有一行褪色的文字：rest。</p>
+<div class="comment-block">
+    <div class="comment-title">归档标记</div>
+    <p>此相册访问量极低，很少有人找到这里。</p>
+</div>`,
+        isEnd:false
+    },
+    "429":{
+        title:"城郊自然保护区旧公告快照",
+        imgName:"郊外蓝铃花花海朦胧剪影",
+        content:`<p>【城郊野生蓝铃花观测公告 · 2011】</p>
+<div class="quote-block">
+根据往年记录，每年4月29日，花海会迎来盛花期，花期持续一周左右。提醒游客：不要随意采摘，保护野生植株。
+</div>
+<div class="comment-block">
+    <div class="comment-title">游客留言</div>
+    <p>游客：去年去过，人好多。</p>
+    <p>游客：今年下雨多，花可能开得晚一点。</p>
+    <p>游客：收藏了，有空去拍照。</p>
+</div>`,
+        isEnd:false
+    },
+    "钟表":{
+        title:"老钟表维修铺网页存档",
+        imgName:"残缺蓝铃花与老式挂钟",
+        content:`<p>本店承接老式挂钟、座钟的检修保养，更换齿轮、发条。</p>
+<div class="quote-block">
+很多送来修理的钟表，背后都带着主人的故事，有的停了很多年。不是所有钟表都适合修好继续走，有些停下来，或许也是一种归宿。
+</div>
+<div class="comment-block">
+    <div class="comment-title">留言板</div>
+    <p>顾客：老板手艺很好，我家老钟修好走了两年。</p>
+    <p>顾客：想问下修理价格，我的钟零件缺了。</p>
+</div>`,
+        isEnd:false
+    },
+    "remembrance":{
+        title:"【档案损坏】完整记忆档案",
+        imgName:"碎裂钟表飘散记忆碎片",
+        content:`<p style="color:#6b2828;">页面数据流撕裂、乱码不断涌现，文字来回跳动闪烁</p>
+<div class="quote-block">
+你执意打捞所有深埋的回忆，把碎片强行拼接成完整的过往。汹涌的悲伤填满这片归档空间。
+</div>
+<p>所有页面索引开始崩坏，记录永久损坏。</p>`,
+        isEnd:true,
+        endType:"bad"
+    },
+    "rest":{
+        title:"【归档封存】",
+        imgName:"花盆长出微光蓝铃花",
+        content:`<p style="color:#325038;">页面失真慢慢消退，光线柔和下来，杂音渐渐平息</p>
+<div class="quote-block">
+链接总有失效的一天，网页快照早晚褪色消散。但是被好好爱过这件事，不需要一直在线。
+</div>`,
+        isEnd:true,
+        endType:"good"
+    },
+    "404":{
+        title:"归档错误 · 记录丢失",
+        imgName:"褪色空白归档底图",
+        content:`<p>你查找的条目，已经从索引里擦除了。</p>
+<div class="quote-block">
+有些名字，时间不想留住。
+</div>
+<p>服务器返回标记：ERR_DATA_ERASED</p>`,
+        isEnd:false
+    },
+    "water1":{
+        title:"【闲聊】最近天气一直阴雨，适合收拾旧东西",
+        imgName:"褪色空白归档底图",
+        content:`<p>连着下了好几天雨，房间里潮乎乎的。</p>
+<div class="quote-block">
+翻箱子翻出来很多旧杂志、旧照片，大多都泛黄了。
+</div>
+<div class="comment-block">
+    <div class="comment-title">网友留言</div>
+    <p>网友：我也讨厌阴雨天，东西容易发霉。</p>
+    <p>网友：收拾旧物很容易想起以前的事。</p>
+    <p>网友：楼主可以放一点干燥剂。</p>
+</div>`,
+        isEnd:false
+    },
+    "water2":{
+        title:"【求助】家里老钟走时不准，有没有懂维修的朋友？",
+        imgName:"褪色空白归档底图",
+        content:`<p>家里一个老挂钟，最近越走越慢，上了发条也没用。</p>
+<div class="quote-block">
+不知道是齿轮磨损还是别的问题，本地找不到修钟的师傅。
+</div>
+<div class="comment-block">
+    <div class="comment-title">网友留言</div>
+    <p>网友：老钟表很难修，零件不好配。</p>
+    <p>网友：可以试试网上找维修店铺。</p>
+    <p>网友：我的钟早就停了，干脆当摆件。</p>
+</div>`,
+        isEnd:false
+    },
+    "water3":{
+        title:"贴图：郊外野花随拍，不知道是什么品种",
+        imgName:"褪色空白归档底图",
+        content:`<p>上周出门散步随手拍的，一大片淡蓝色小花。</p>
+<div class="quote-block">
+不知道叫什么名字，看着很安静。
+</div>
+<div class="comment-block">
+    <div class="comment-title">网友留言</div>
+    <p>网友：有点像风铃草？</p>
+    <p>网友：我这边山上也有，春天才开。</p>
+    <p>网友：好看，拍得很有氛围感。</p>
+</div>`,
+        isEnd:false
+    },
+    "water4":{
+        title:"【灌水】深夜睡不着，随便写几句碎念",
+        imgName:"褪色空白归档底图",
+        content:`<p>凌晨两点，毫无睡意。</p>
+<div class="quote-block">
+翻着这个老归档网站，好多人都已经消失了。网络好像一个巨大的垃圾堆，很多东西慢慢被忘掉。
+</div>
+<div class="comment-block">
+    <div class="comment-title">网友留言</div>
+    <p>网友：我也经常熬夜逛旧网站。</p>
+    <p>网友：早点休息吧。</p>
+</div>`,
+        isEnd:false
+    }
+};
+
+const imgSrcMap = {
+    "残缺蓝铃花与老式挂钟":"",
+    "郊外蓝铃花花海朦胧剪影":"",
+    "老旧木制八音盒":"",
+    "裂纹老镜子带淡虚影":"",
+    "窗台空陶土花盆":"",
+    "碎裂钟表飘散记忆碎片":"",
+    "花盆长出微光蓝铃花":"",
+    "褪色空白归档底图":""
+};
+
+const normalizeKey = function(raw){
+    return raw.trim().replace(/[《》]/g,"");
+};
+
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+function playSuccessSound(){
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);gain.connect(audioCtx.destination);
+    osc.type="square";
+    osc.frequency.value=220;
+    gain.gain.setValueAtTime(0.08,audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+0.12);
+    osc.start();osc.stop(audioCtx.currentTime+0.12);
+}
+function play404Sound(){
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);gain.connect(audioCtx.destination);
+    osc.type="sine";
+    osc.frequency.value=90;
+    gain.gain.setValueAtTime(0.09,audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+0.35);
+    osc.start();osc.stop(audioCtx.currentTime+0.35);
+}
+let fanNoise;
+function startFanNoise(){
+    if(fanNoise) return;
+    const bufferSize = audioCtx.sampleRate * 2;
+    const noiseBuffer = audioCtx.createBuffer(1,bufferSize,audioCtx.sampleRate);
+    const output = noiseBuffer.getChannelData(0);
+    for(let i=0;i<bufferSize;i++) output[i] = Math.random()*2 -1;
+    fanNoise = audioCtx.createBufferSource();
+    fanNoise.buffer = noiseBuffer;
+    fanNoise.loop=true;
+    const gain = audioCtx.createGain();
+    gain.gain.value=0.02;
+    fanNoise.connect(gain);gain.connect(audioCtx.destination);
+    fanNoise.start();
+}
+function stopFanNoise(){
+    if(fanNoise) fanNoise.stop();fanNoise=null;
+}
+
+let history = [];
+let isGoodEnd = localStorage.getItem("forgetIndex_goodend") === "1";
+const contentDom = document.getElementById("content");
+const historyDom = document.getElementById("history-list");
+const inputDom = document.getElementById("search-input");
+
+function typeWrite(html,callback){
+    contentDom.innerHTML = "";
+    let temp = document.createElement("div");
+    temp.innerHTML = html;
+    let text = temp.innerText;
+    let idx = 0;
+    const wrap = document.createElement("div");
+    wrap.className="type-text";
+    contentDom.appendChild(wrap);
+    const timer = setInterval(()=>{
+        if(idx >= text.length){
+            clearInterval(timer);
+            if(callback) callback();
+            document.querySelectorAll(".archive-link").forEach(link=>{
+                link.onclick = ()=>{
+                    const target = link.dataset.goto;
+                    startFanNoise();
+                    playSuccessSound();
+                    if(!history.includes(target)) history.push(target);
+                    refreshHistory();
+                    renderPage(target);
+                }
+            })
+            return;
+        }
+        wrap.innerText += text[idx];
+        idx++;
+    },28);
+}
+
+function renderPage(key){
+    const page = pageData[key];
+    if(!page) return;
+    let imgHtml = "";
+    if(imgSrcMap[page.imgName]){
+        imgHtml = `<div class="page-img">
+            <img src="${imgSrcMap[page.imgName]}" style="width:100%;display:block;">
+            <div class="img-mask"></div>
+        </div>`;
+    }
+    let finalHtml = `<h3>${page.title}</h3>${imgHtml}${page.content}`;
+    if(isGoodEnd && key === "home"){
+        finalHtml += `<div class="flower-mark">🌿</div>`;
+    }
+    typeWrite(finalHtml,()=>{
+        if(!page.isEnd){
+            setTimeout(()=>{
+                contentDom.classList.add("glitch");
+                setTimeout(()=>contentDom.classList.remove("glitch"),300);
+            },Math.random()*6000+2000);
+        }
+        if(page.isEnd && page.endType==="good"){
+            localStorage.setItem("forgetIndex_goodend","1");
+            isGoodEnd=true;
+            stopFanNoise();
+        }else if(page.isEnd && page.endType==="bad"){
+            stopFanNoise();
+        }
+    });
+}
+
+function refreshHistory(){
+    historyDom.innerText = history.join(" → ");
+}
+
+function doSearch(){
+    const raw = inputDom.value.trim();
+    inputDom.value = "";
+    if(!raw) return;
+    startFanNoise();
+    const targetKey = normalizeKey(raw);
+    if(!pageData[targetKey]){
+        play404Sound();
+        renderPage("404");
+        return;
+    }
+    playSuccessSound();
+    if(!history.includes(targetKey)) history.push(targetKey);
+    refreshHistory();
+    renderPage(targetKey);
+}
+
+function resetGame(){
+    history = [];
+    refreshHistory();
+    localStorage.removeItem("forgetIndex_goodend");
+    isGoodEnd = false;
+    stopFanNoise();
+    renderPage("home");
+}
+
+document.getElementById("search-btn").onclick = doSearch;
+document.getElementById("reset-btn").onclick = resetGame;
+inputDom.onkeydown = (e)=>{if(e.key==="Enter") doSearch();};
+
+renderPage("home");
+refreshHistory();
+</script>
+</body>
+</html>
